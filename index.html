@@ -176,7 +176,7 @@
       border-radius: 16px;
       box-shadow: 0 8px 24px rgba(60, 64, 67, 0.25);
       text-align: center;
-      max-width: 320px;
+      max-width: 340px;
     }
 
     .card h2 {
@@ -214,6 +214,55 @@
       transform: scale(0.98);
     }
 
+    .snake-color-picker {
+      margin: 0 0 18px;
+      text-align: center;
+    }
+
+    .snake-color-picker.hidden {
+      display: none;
+    }
+
+    .picker-label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .swatches {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .swatch {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border: 3px solid transparent;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 1px 3px var(--shadow);
+      transition: transform 0.12s ease, border-color 0.12s ease;
+    }
+
+    .swatch:hover {
+      transform: scale(1.08);
+    }
+
+    .swatch:focus-visible {
+      outline: 2px solid #1a73e8;
+      outline-offset: 2px;
+    }
+
+    .swatch[aria-checked="true"] {
+      border-color: var(--text);
+      transform: scale(1.06);
+    }
+
     .hint {
       font-size: 0.8rem;
       color: var(--muted);
@@ -243,13 +292,24 @@
     <div class="board-outer">
       <div id="board" aria-label="Snake game board"></div>
     </div>
-    <p class="hint">Arrow keys to move · Space to pause · Eat apples, avoid walls and yourself</p>
+    <p class="hint">Pick a snake color, then play · Arrow keys to move · Space to pause</p>
   </div>
 
   <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="overlay-title">
     <div class="card">
       <h2 id="overlay-title">Snake</h2>
       <p id="overlay-msg">Press an arrow key or click Play to start.</p>
+      <div class="snake-color-picker" id="color-picker" role="presentation">
+        <span class="picker-label" id="picker-label">Snake color</span>
+        <div class="swatches" role="radiogroup" aria-labelledby="picker-label">
+          <button type="button" class="swatch" data-theme="green" aria-label="Green" aria-checked="true" style="background: #34a853"></button>
+          <button type="button" class="swatch" data-theme="blue" aria-label="Blue" aria-checked="false" style="background: #1a73e8"></button>
+          <button type="button" class="swatch" data-theme="purple" aria-label="Purple" aria-checked="false" style="background: #9334e6"></button>
+          <button type="button" class="swatch" data-theme="orange" aria-label="Orange" aria-checked="false" style="background: #f29900"></button>
+          <button type="button" class="swatch" data-theme="teal" aria-label="Teal" aria-checked="false" style="background: #00a79d"></button>
+          <button type="button" class="swatch" data-theme="rose" aria-label="Rose" aria-checked="false" style="background: #e9427a"></button>
+        </div>
+      </div>
       <button type="button" id="overlay-btn">Play</button>
     </div>
   </div>
@@ -260,6 +320,16 @@
       const ROWS = 15;
       const TICK_MS = 130;
       const STORAGE_KEY = "snake-best-score";
+      const THEME_KEY = "snake-theme";
+
+      const SNAKE_THEMES = {
+        green: { head: "#34a853", body: "#188038", mid: "#1e8e3e" },
+        blue: { head: "#1a73e8", body: "#1557b0", mid: "#1967d2" },
+        purple: { head: "#9334e6", body: "#6b2bbf", mid: "#7c3fdb" },
+        orange: { head: "#f29900", body: "#b9770e", mid: "#d68910" },
+        teal: { head: "#00a79d", body: "#00786f", mid: "#009688" },
+        rose: { head: "#e9427a", body: "#b0305c", mid: "#c83b68" },
+      };
 
       const boardEl = document.getElementById("board");
       const scoreEl = document.getElementById("score");
@@ -268,8 +338,26 @@
       const overlayMsg = document.getElementById("overlay-msg");
       const overlayBtn = document.getElementById("overlay-btn");
       const overlayTitle = document.getElementById("overlay-title");
+      const colorPickerEl = document.getElementById("color-picker");
+      const swatchEls = document.querySelectorAll(".swatch");
 
       let cells = [];
+      let currentThemeId = "green";
+
+      function applySnakeTheme(themeId) {
+        const t = SNAKE_THEMES[themeId] || SNAKE_THEMES.green;
+        const root = document.documentElement;
+        root.style.setProperty("--snake-head", t.head);
+        root.style.setProperty("--snake-body", t.body);
+        root.style.setProperty("--snake-body-mid", t.mid);
+        currentThemeId = SNAKE_THEMES[themeId] ? themeId : "green";
+        localStorage.setItem(THEME_KEY, currentThemeId);
+        swatchEls.forEach((btn) => {
+          const on = btn.dataset.theme === currentThemeId;
+          btn.setAttribute("aria-checked", on ? "true" : "false");
+        });
+      }
+
       let snake = [];
       let direction = { x: 1, y: 0 };
       let pendingDir = { x: 1, y: 0 };
@@ -350,6 +438,11 @@
         overlayTitle.textContent = title;
         overlayMsg.textContent = msg;
         overlayBtn.textContent = btnText;
+        if (btnText === "Resume") {
+          colorPickerEl.classList.add("hidden");
+        } else {
+          colorPickerEl.classList.remove("hidden");
+        }
         overlay.classList.add("visible");
       }
 
@@ -491,6 +584,18 @@
         }
         startGame(false);
       });
+
+      swatchEls.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          applySnakeTheme(btn.dataset.theme);
+          render();
+        });
+      });
+
+      const savedTheme = localStorage.getItem(THEME_KEY);
+      if (savedTheme && SNAKE_THEMES[savedTheme]) {
+        applySnakeTheme(savedTheme);
+      }
 
       buildBoard();
       resetSnake();
